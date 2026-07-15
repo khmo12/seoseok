@@ -140,42 +140,38 @@ function renderEvent(state, event) {
   card.appendChild(el("h3", { text: event.title }));
   card.appendChild(el("p", { text: event.desc }));
 
-  event.choices.forEach((c) => {
-    const btn = el("button", { class: "btn-choice", text: c.text });
-    btn.addEventListener("click", async () => {
-      card.querySelectorAll("button").forEach((b) => (b.disabled = true));
-      try {
-        const data = await api("/api/choice", { choice_index: c.index });
-        renderResult(data);
-      } catch (e) {
-        alert("선택 처리 실패: " + e.message);
-        card.querySelectorAll("button").forEach((b) => (b.disabled = false));
-      }
-    });
-    card.appendChild(btn);
+  // --- 자유 답변(AI 판정) 섹션: 최상단, 강조 ---
+  const aiBox = el("div", { class: "ai-box" });
+  aiBox.appendChild(el("div", { class: "ai-badge", text: "🤖 AI 자유 판정 · 이 게임의 핵심" }));
+  aiBox.appendChild(el("label", {
+    class: "field-label ai-label",
+    text: "교장으로서 어떻게 하시겠습니까? 원하는 대로 자유롭게 써보세요.",
+  }));
+
+  const textArea = el("textarea", {
+    class: "ai-textarea",
+    attrs: {
+      rows: "3",
+      placeholder: "예: 학부모 대표단과 원탁회의를 열어 함께 결정한다",
+    },
   });
+  aiBox.appendChild(textArea);
 
-  card.appendChild(el("hr", { class: "divider" }));
-  card.appendChild(el("label", { class: "field-label", text: "또는, 나만의 결정을 직접 입력해보세요:" }));
-
-  const row = el("div", { class: "custom-row" });
-  const textInput = el("input", { attrs: { type: "text", placeholder: "예: 학부모 대표단과 원탁회의를 열어 함께 결정한다" } });
-  const submitBtn = el("button", { class: "btn-secondary", text: "이 결정을 실행" });
+  const submitBtn = el("button", { class: "btn-ai", text: "✦ AI에게 판정받기" });
   const statusMsg = el("div", { class: "status-msg" });
-  row.appendChild(textInput);
-  row.appendChild(submitBtn);
-  card.appendChild(row);
-  card.appendChild(statusMsg);
+  aiBox.appendChild(submitBtn);
+  aiBox.appendChild(statusMsg);
+  card.appendChild(aiBox);
 
   submitBtn.addEventListener("click", async () => {
-    const text = textInput.value.trim();
+    const text = textArea.value.trim();
     if (!text) {
       statusMsg.textContent = "문장을 입력한 뒤 눌러주세요.";
       statusMsg.className = "status-msg error";
       return;
     }
-    card.querySelectorAll("button, input").forEach((b) => (b.disabled = true));
-    statusMsg.textContent = "결정을 판정하는 중... (Gemini 호출에는 몇 초 걸릴 수 있어요)";
+    card.querySelectorAll("button, textarea").forEach((b) => (b.disabled = true));
+    statusMsg.textContent = "AI가 결정을 판정하는 중... (몇 초 걸릴 수 있어요)";
     statusMsg.className = "status-msg pending";
     try {
       const data = await api("/api/custom", { text });
@@ -183,12 +179,34 @@ function renderEvent(state, event) {
     } catch (e) {
       statusMsg.textContent = "판정 실패: " + e.message;
       statusMsg.className = "status-msg error";
-      card.querySelectorAll("button, input").forEach((b) => (b.disabled = false));
+      card.querySelectorAll("button, textarea").forEach((b) => (b.disabled = false));
     }
   });
 
-  textInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") submitBtn.click();
+  textArea.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      submitBtn.click();
+    }
+  });
+
+  // --- 정해진 선택지: 하단, 보조 옵션으로 톤다운 ---
+  card.appendChild(el("hr", { class: "divider" }));
+  card.appendChild(el("label", { class: "quick-choices-label", text: "또는, 빠른 선택지" }));
+
+  event.choices.forEach((c) => {
+    const btn = el("button", { class: "btn-choice-quiet", text: c.text });
+    btn.addEventListener("click", async () => {
+      card.querySelectorAll("button, textarea").forEach((b) => (b.disabled = true));
+      try {
+        const data = await api("/api/choice", { choice_index: c.index });
+        renderResult(data);
+      } catch (e) {
+        alert("선택 처리 실패: " + e.message);
+        card.querySelectorAll("button, textarea").forEach((b) => (b.disabled = false));
+      }
+    });
+    card.appendChild(btn);
   });
 
   screen.appendChild(card);
